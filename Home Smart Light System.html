@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Control System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 50%, rgba(51, 65, 85, 0.9) 100%),
+                        url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .header h1 {
+            color: #ffffff;
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 i {
+            color: #60a5fa;
+            filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.5));
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-indicator.connected {
+            background: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+        }
+
+        .status-indicator.disconnected {
+            background: #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .settings-panel {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .settings-panel.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .settings-panel h2 {
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .settings-panel h2 i {
+            color: #60a5fa;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-group input {
+            padding: 12px 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            backdrop-filter: blur(10px);
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.6);
+        }
+
+        .btn-settings {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-settings:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: #60a5fa;
+            box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
+        }
+
+        .master-controls {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .master-controls h2 {
+            margin-bottom: 20px;
+            color: #ffffff;
+            font-size: 1.8rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .master-controls h2 i {
+            color: #60a5fa;
+        }
+
+        .master-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 80px;
+        }
+
+        .room-card {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .room-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .room-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+
+        .room-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .room-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .switches-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .switch-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .switch-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(96, 165, 250, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .switch-name {
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(30px);
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9));
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                background-attachment: scroll;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .master-buttons {
+                justify-content: center;
+            }
+
+            .rooms-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-home"></i>
+                Smart Home Control
+            </h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="connection-status">
+                    <div class="status-indicator disconnected" id="statusIndicator"></div>
+                    <span id="connectionStatus">Disconnected</span>
+                </div>
+                <button class="btn btn-settings" onclick="toggleSettings()">
+                    <i class="fas fa-cog"></i>
+                    Settings
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel">
+            <h2 style="margin-bottom: 20px;">
+                <i class="fas fa-network-wired"></i>
+                MQTT Broker Configuration
+            </h2>
+            <div class="settings-grid">
+                <div class="input-group">
+                    <label for="brokerHost">Broker Host</label>
+                    <input type="text" id="brokerHost" value="broker.emqx.io" placeholder="broker.emqx.io">
+                </div>
+                <div class="input-group">
+                    <label for="brokerPort">Port</label>
+                    <input type="number" id="brokerPort" value="8083" placeholder="8083">
+                </div>
+                <div class="input-group">
+                    <label for="brokerUsername">Username (optional)</label>
+                    <input type="text" id="brokerUsername" placeholder="Username">
+                </div>
+                <div class="input-group">
+                    <label for="brokerPassword">Password (optional)</label>
+                    <input type="password" id="brokerPassword" placeholder="Password">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="connectMQTT()">
+                <i class="fas fa-plug"></i>
+                Connect to Broker
+            </button>
+        </div>
+
+        <!-- Master Controls -->
+        <div class="master-controls">
+            <h2>
+                <i class="fas fa-toggle-on"></i>
+                Master Controls
+            </h2>
+            <div class="master-buttons">
+                <button class="btn btn-success" onclick="toggleAllLights(true)">
+                    <i class="fas fa-lightbulb"></i>
+                    Turn All ON
+                </button>
+                <button class="btn btn-danger" onclick="toggleAllLights(false)">
+                    <i class="fas fa-power-off"></i>
+                    Turn All OFF
+                </button>
+            </div>
+        </div>
+
+        <!-- Rooms Grid -->
+        <div class="rooms-grid" id="roomsGrid">
+            <!-- Rooms will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <span>Total Lights: <span id="totalLights">15</span></span>
+        <span>Active Lights: <span id="activeLights">0</span></span>
+        <span>MQTT Status: <span id="mqttStatus">Disconnected</span></span>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Room configuration
+        const rooms = [
+            {
+                id: 'room1',
+                name: 'Room 1',
+                icon: 'fas fa-bed',
+                switches: [
+                    { id: 'room1_switch1', name: 'Main Light', topic: 'home/room1/light1', state: false },
+                    { id: 'room1_switch2', name: 'Outdoor Light', topic: 'home/room1/light2', state: false }
+                ]
+            },
+            {
+                id: 'room2',
+                name: 'Room 2',
+                icon: 'fas fa-bed',
+                switches: [
+                    { id: 'room2_switch1', name: 'Main Light', topic: 'home/room2/light1', state: false },
+                    { id: 'room2_switch2', name: 'Outdoor Light', topic: 'home/room2/light2', state: false }
+                ]
+            },
+            {
+                id: 'room3',
+                name: 'Room 3',
+                icon: 'fas fa-bed',
+                switches: [
+                    { id: 'room3_switch1', name: 'Main Light', topic: 'home/room3/light1', state: false },
+                    { id: 'room3_switch2', name: 'Outdoor Light', topic: 'home/room3/light2', state: false }
+                ]
+            },
+            {
+                id: 'room4',
+                name: 'Room 4',
+                icon: 'fas fa-bed',
+                switches: [
+                    { id: 'room4_switch1', name: 'Main Light', topic: 'home/room4/light1', state: false },
+                    { id: 'room4_switch2', name: 'Outdoor Light', topic: 'home/room4/light2', state: false }
+                ]
+            },
+            {
+                id: 'living',
+                name: 'Living Room',
+                icon: 'fas fa-couch',
+                switches: [
+                    { id: 'living_switch1', name: 'Main Light', topic: 'home/living/light1', state: false },
+                    { id: 'living_switch2', name: 'Secondary Light', topic: 'home/living/light2', state: false }
+                ]
+            },
+            {
+                id: 'middle',
+                name: 'Middle Room',
+                icon: 'fas fa-chair',
+                switches: [
+                    { id: 'middle_switch1', name: 'Main Light', topic: 'home/middle/light1', state: false },
+                    { id: 'middle_switch2', name: 'Secondary Light', topic: 'home/middle/light2', state: false }
+                ]
+            },
+            {
+                id: 'front',
+                name: 'Front Room',
+                icon: 'fas fa-door-open',
+                switches: [
+                    { id: 'front_switch1', name: 'Main Light', topic: 'home/front/light1', state: false },
+                    { id: 'front_switch2', name: 'Outdoor Light', topic: 'home/front/light2', state: false }
+                ]
+            },
+            {
+                id: 'kitchen',
+                name: 'Kitchen',
+                icon: 'fas fa-utensils',
+                switches: [
+                    { id: 'kitchen_switch1', name: 'Main Light', topic: 'home/kitchen/light1', state: false },
+                    { id: 'kitchen_switch2', name: 'Outdoor Light', topic: 'home/kitchen/light2', state: false }
+                ]
+            }
+        ];
+
+        // MQTT client variable
+        let mqttClient = null;
+        let isConnected = false;
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            renderRooms();
+            updateStatusBar();
+        });
+
+        // Render rooms
+        function renderRooms() {
+            const roomsGrid = document.getElementById('roomsGrid');
+            roomsGrid.innerHTML = '';
+
+            rooms.forEach(room => {
+                const roomCard = document.createElement('div');
+                roomCard.className = 'room-card';
+                roomCard.innerHTML = `
+                    <div class="room-header">
+                        <div class="room-icon">
+                            <i class="${room.icon}"></i>
+                        </div>
+                        <div class="room-name">${room.name}</div>
+                    </div>
+                    <div class="switches-container">
+                        ${room.switches.map(switchItem => `
+                            <div class="switch-item">
+                                <div class="switch-name">${switchItem.name}</div>
+                                <div class="toggle-switch ${switchItem.state ? 'active' : ''}" 
+                                     onclick="toggleSwitch('${room.id}', '${switchItem.id}')">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                roomsGrid.appendChild(roomCard);
+            });
+        }
+
+        // Toggle settings panel
+        function toggleSettings() {
+            const settingsPanel = document.getElementById('settingsPanel');
+            settingsPanel.classList.toggle('show');
+        }
+
+        // Connect to MQTT broker
+        function connectMQTT() {
+            const host = document.getElementById('brokerHost').value;
+            const port = document.getElementById('brokerPort').value;
+            const username = document.getElementById('brokerUsername').value;
+            const password = document.getElementById('brokerPassword').value;
+
+            if (!host || !port) {
+                showToast('Please enter broker host and port', 'error');
+                return;
+            }
+
+            try {
+                const clientId = `SmartHome_${Date.now()}`;
+                mqttClient = new Paho.MQTT.Client(host, parseInt(port), "/mqtt", clientId);
+
+                mqttClient.onConnectionLost = onConnectionLost;
+                mqttClient.onMessageArrived = onMessageArrived;
+
+                const connectOptions = {
+                    onSuccess: onConnect,
+                    onFailure: onConnectFailure,
+                    useSSL: false
+                };
+
+                if (username) connectOptions.userName = username;
+                if (password) connectOptions.password = password;
+
+                mqttClient.connect(connectOptions);
+                showToast('Connecting to MQTT broker...', 'success');
+            } catch (error) {
+                console.error('MQTT connection error:', error);
+                showToast('Failed to connect to MQTT broker', 'error');
+            }
+        }
+
+        // MQTT connection success
+        function onConnect() {
+            console.log('Connected to MQTT broker');
+            isConnected = true;
+            updateConnectionStatus(true);
+            showToast('Connected to MQTT broker successfully!', 'success');
+
+            // Subscribe to all topics
+            rooms.forEach(room => {
+                room.switches.forEach(switchItem => {
+                    mqttClient.subscribe(switchItem.topic + '/status');
+                });
+            });
+        }
+
+        // MQTT connection failure
+        function onConnectFailure(error) {
+            console.error('MQTT connection failed:', error);
+            isConnected = false;
+            updateConnectionStatus(false);
+            showToast('Failed to connect to MQTT broker', 'error');
+        }
+
+        // MQTT connection lost
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log('MQTT connection lost:', responseObject.errorMessage);
+                isConnected = false;
+                updateConnectionStatus(false);
+                showToast('MQTT connection lost', 'error');
+            }
+        }
+
+        // MQTT message received
+        function onMessageArrived(message) {
+            console.log('Message received:', message.destinationName, message.payloadString);
+            // Handle status updates from ESP32 if needed
+        }
+
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const mqttStatus = document.getElementById('mqttStatus');
+
+            if (connected) {
+                statusIndicator.className = 'status-indicator connected';
+                connectionStatus.textContent = 'Connected';
+                mqttStatus.textContent = 'Connected';
+            } else {
+                statusIndicator.className = 'status-indicator disconnected';
+                connectionStatus.textContent = 'Disconnected';
+                mqttStatus.textContent = 'Disconnected';
+            }
+        }
+
+        // Toggle individual switch
+        function toggleSwitch(roomId, switchId) {
+            const room = rooms.find(r => r.id === roomId);
+            const switchItem = room.switches.find(s => s.id === switchId);
+            
+            switchItem.state = !switchItem.state;
+            
+            // Publish MQTT message
+            if (isConnected && mqttClient) {
+                const message = new Paho.MQTT.Message(switchItem.state ? '1' : '0');
+                message.destinationName = switchItem.topic;
+                mqttClient.send(message);
+                
+                console.log(`Published: ${switchItem.topic} = ${switchItem.state ? '1' : '0'}`);
+                showToast(`${room.name} - ${switchItem.name}: ${switchItem.state ? 'ON' : 'OFF'}`, 'success');
+            } else {
+                showToast('MQTT not connected', 'error');
+            }
+            
+            renderRooms();
+            updateStatusBar();
+        }
+
+        // Toggle all lights
+        function toggleAllLights(turnOn) {
+            rooms.forEach(room => {
+                room.switches.forEach(switchItem => {
+                    switchItem.state = turnOn;
+                    
+                    // Publish MQTT message
+                    if (isConnected && mqttClient) {
+                        const message = new Paho.MQTT.Message(turnOn ? '1' : '0');
+                        message.destinationName = switchItem.topic;
+                        mqttClient.send(message);
+                    }
+                });
+            });
+            
+            renderRooms();
+            updateStatusBar();
+            showToast(`All lights turned ${turnOn ? 'ON' : 'OFF'}`, 'success');
+        }
+
+        // Update status bar
+        function updateStatusBar() {
+            const totalLights = rooms.reduce((acc, room) => acc + room.switches.length, 0);
+            const activeLights = rooms.reduce((acc, room) => 
+                acc + room.switches.filter(s => s.state).length, 0);
+            
+            document.getElementById('totalLights').textContent = totalLights;
+            document.getElementById('activeLights').textContent = activeLights;
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
